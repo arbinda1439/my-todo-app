@@ -1,84 +1,132 @@
 import { useState, useEffect } from 'react';
-import './App.css'; // We will style this next
+import './App.css';
 
 function App() {
-  // 1. Initialize state. Try to fetch from localStorage first. 
-  // If nothing is there, start with an empty array.
   const [todos, setTodos] = useState(() => {
-    const savedTodos = localStorage.getItem('my-todos');
-    return savedTodos ? JSON.parse(savedTodos) : [];
+    const saved = localStorage.getItem('fl-todos');
+    return saved ? JSON.parse(saved) : [];
   });
-  
   const [inputValue, setInputValue] = useState('');
+  const [filter, setFilter] = useState('all');
 
-  // 2. Use useEffect to save todos to localStorage automatically 
-  // every single time the 'todos' state changes.
   useEffect(() => {
-    localStorage.setItem('my-todos', JSON.stringify(todos));
+    localStorage.setItem('fl-todos', JSON.stringify(todos));
   }, [todos]);
 
-  // 3. Function to add a new todo
-  const addTodo = (e) => {
-    e.preventDefault(); // Prevents the page from refreshing on form submit
-    if (!inputValue.trim()) return; // Don't add empty todos
-
-    const newTodo = {
-      id: crypto.randomUUID(), // Generates a unique ID
-      text: inputValue,
-      isCompleted: false
-    };
-
-    setTodos([...todos, newTodo]);
-    setInputValue(''); // Clear the input field
+  const addTodo = () => {
+    const text = inputValue.trim();
+    if (!text) return;
+    setTodos([{ id: crypto.randomUUID(), text, done: false }, ...todos]);
+    setInputValue('');
   };
 
-  // 4. Function to toggle complete status
   const toggleTodo = (id) => {
-    const updatedTodos = todos.map(todo => {
-      if (todo.id === id) {
-        return { ...todo, isCompleted: !todo.isCompleted };
-      }
-      return todo;
-    });
-    setTodos(updatedTodos);
+    setTodos(todos.map(t => t.id === id ? { ...t, done: !t.done } : t));
   };
 
-  // 5. Function to delete a todo
   const deleteTodo = (id) => {
-    const remainingTodos = todos.filter(todo => todo.id !== id);
-    setTodos(remainingTodos);
+    setTodos(todos.filter(t => t.id !== id));
   };
+
+  const clearDone = () => {
+    setTodos(todos.filter(t => !t.done));
+  };
+
+  const filtered = filter === 'active'
+    ? todos.filter(t => !t.done)
+    : filter === 'done'
+    ? todos.filter(t => t.done)
+    : todos;
+
+  const remaining = todos.filter(t => !t.done).length;
+  const doneCount = todos.length - remaining;
+  const progress = todos.length > 0 ? Math.round((doneCount / todos.length) * 100) : 0;
 
   return (
-    <div className="app-container">
-      <h1>My Todo List</h1>
-      
-      {/* Input Form */}
-      <form onSubmit={addTodo} className="todo-form">
-        <input 
-          type="text" 
-          placeholder="What needs to be done?" 
+    <div className="fl-root">
+      <div className="fl-header">
+        <h1 className="fl-title">
+          <span className="fl-title-dot" />
+          Focus List
+        </h1>
+        <div className="fl-count-pill">
+          <span className="fl-count-num">{remaining}</span>&nbsp;remaining
+        </div>
+      </div>
+
+      <div className="fl-input-row">
+        <input
+          className="fl-input"
+          type="text"
+          placeholder="Add a task..."
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && addTodo()}
+          maxLength={200}
         />
-        <button type="submit">Add</button>
-      </form>
+        <button className="fl-add-btn" onClick={addTodo}>+ Add</button>
+      </div>
 
-      {/* Todo List */}
-      <ul className="todo-list">
-        {todos.map(todo => (
-          <li key={todo.id} className={todo.isCompleted ? 'completed' : ''}>
-            <span onClick={() => toggleTodo(todo.id)}>
-              {todo.text}
-            </span>
-            <button onClick={() => deleteTodo(todo.id)} className="delete-btn">
+      <div className="fl-filter-row">
+        {['all', 'active', 'done'].map(f => (
+          <button
+            key={f}
+            className={`fl-filter-btn ${filter === f ? 'active' : ''}`}
+            onClick={() => setFilter(f)}
+          >
+            {f.charAt(0).toUpperCase() + f.slice(1)}
+          </button>
+        ))}
+      </div>
+
+      {todos.length > 0 && (
+        <div className="fl-progress">
+          <div className="fl-progress-label">
+            <span>Progress</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="fl-progress-bar-bg">
+            <div className="fl-progress-bar-fill" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+
+      <ul className="fl-list">
+        {filtered.map(todo => (
+          <li
+            key={todo.id}
+            className={`fl-item ${todo.done ? 'done' : ''}`}
+            onClick={() => toggleTodo(todo.id)}
+          >
+            <div className="fl-checkbox">
+              {todo.done && <span className="fl-check-icon">✓</span>}
+            </div>
+            <span className="fl-text">{todo.text}</span>
+            <button
+              className="fl-delete-btn"
+              onClick={(e) => { e.stopPropagation(); deleteTodo(todo.id); }}
+              aria-label="Delete task"
+            >
               ✕
             </button>
           </li>
         ))}
       </ul>
-      
-      {todos.length === 0 && <p className="empty-message">No tasks yet. Add one above!</p>}
+
+      {filtered.length === 0 && (
+        <div className="fl-empty">
+          <div className="fl-empty-icon">🎯</div>
+          <p>Nothing on your radar.<br />Relax — or add something.</p>
+        </div>
+      )}
+
+      <div className="fl-footer">
+        {doneCount > 0 && (
+          <button className="fl-clear-btn" onClick={clearDone}>
+            Clear completed
+          </button>
+        )}
+      </div>
     </div>
   );
 }
